@@ -19,16 +19,18 @@
         <label for="personal-token">Personal token: </label>
         <input name="personal-token" id="personal-token" />
 
+        <hr>
+
+        <label for="temrs">Terms: </label>
+        <input name="temrs" id="search" />
         <button type="button" id="button-search">search</button>
 
-        <p>Total count: <span id="total-count">0</span></p>
         <hr>
         <div id="repositories"></div>
     </div>
 
     <script type="text/javascript" async>
         const contentContainer = document.getElementById('content')
-        const elTotalCount = document.getElementById('total-count')
         const repositoriesList = document.getElementById('repositories')
 
         function removeChildNodes(el) {
@@ -63,6 +65,48 @@
             return card
         }
 
+        function mountQuery() {
+            // const query =
+            //     `query { viewer { repositories(first: 100) { totalCount nodes { nameWithOwner name description createdAt } pageInfo { endCursor hasNextPage } } } }`
+
+            const now = formatDate(new Date())
+
+            const querySearch = `created:>=${now}`
+
+            const query = `
+            query {
+                search( type: REPOSITORY, query: """${querySearch}""", last: 5 ) {
+                    nodes {
+                        ...on Repository {
+                            name 
+                            description 
+                            nameWithOwner 
+                            createdAt 
+                            pushedAt 
+                            updatedAt 
+                        }
+                    }
+                    pageInfo { endCursor hasNextPage }
+                }
+            }`
+
+            return query
+        }
+
+        function formatDate(date) {
+            let day = date.getDate()
+            let month = date.getMonth() + 1
+            const year = date.getFullYear()
+
+            if (day < 10)
+                day = `0${day}`
+
+            if (month < 10)
+                month = `0${month}`
+
+            return `${year}-${month}-${day}`
+        }
+
         function populateListRepositories(nodes) {
             removeChildNodes(repositoriesList)
             nodes.forEach(repository => {
@@ -72,8 +116,7 @@
         }
 
         function requestRepositories(token) {
-            const query =
-                "query { viewer { repositories(first: 100) { totalCount nodes { nameWithOwner name description createdAt } pageInfo { endCursor hasNextPage } } } }"
+            const query = mountQuery()
 
             fetch('https://api.github.com/graphql', {
                     method: 'POST',
@@ -82,20 +125,20 @@
                         'Accept': 'application/json',
                         'Authorization': 'bearer ' + token
                     },
-                    body: JSON.stringify({
-                        query: query
-                    })
+                    body: JSON.stringify({ query: query })
                 })
                 .then(r => r.json())
                 .then(reponse => {
-                    const repositories = reponse.data.viewer.repositories
+                    const repositories = reponse.data.search
 
                     localStorage.setItem('repositories', JSON.stringify(repositories))
-
-                    elTotalCount.innerHTML = repositories.totalCount
                     populateListRepositories(repositories.nodes)
                 });
         }
+
+        const repositories = JSON.parse(localStorage.getItem('repositories'))
+        if (repositories !== null)
+            populateListRepositories(repositories.nodes)
 
         const input = document.getElementById('personal-token')
         const btnSearch = document.getElementById('button-search')
@@ -111,13 +154,6 @@
                 alert("required personal token")
             }
         })
-
-        const localStorageRepositories = localStorage.getItem('repositories')
-        if (localStorageRepositories !== null) {
-            const repositories = JSON.parse(localStorageRepositories)
-            elTotalCount.innerHTML = repositories.totalCount
-            populateListRepositories(repositories.nodes)
-        }
     </script>
 </body>
 
