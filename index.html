@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Github API study</title>
+
+    <style>
+        .card {
+            padding: 10px 20px;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div id="content">
+        <label for="personal-token">Personal token: </label>
+        <input name="personal-token" id="personal-token" />
+
+        <button type="button" id="button-search">search</button>
+
+        <p>Total count: <span id="total-count">0</span></p>
+        <hr>
+        <div id="repositories"></div>
+    </div>
+
+    <script type="text/javascript" async>
+        const contentContainer = document.getElementById('content')
+        const elTotalCount = document.getElementById('total-count')
+        const repositoriesList = document.getElementById('repositories')
+
+        function removeChildNodes(el) {
+            while (el.hasChildNodes()) {
+                el.removeChild(el.firstChild)
+            }
+        }
+
+        function createCardRepository(repository) {
+            const {
+                nameWithOwner,
+                name,
+                description,
+                createdAt
+            } = repository
+
+            const card = document.createElement('div');
+            card.className = "card"
+
+            const header = document.createElement('h2')
+            header.appendChild(document.createTextNode(name))
+            card.appendChild(header)
+
+            const body = document.createElement('p')
+            body.appendChild(document.createTextNode(description))
+            card.appendChild(body)
+
+            const footer = document.createElement('div')
+            footer.appendChild(document.createTextNode(`${nameWithOwner} ${createdAt}`))
+            card.appendChild(footer)
+
+            return card
+        }
+
+        function populateListRepositories(nodes) {
+            removeChildNodes(repositoriesList)
+            nodes.forEach(repository => {
+                const card = createCardRepository(repository)
+                repositoriesList.appendChild(card)
+            });
+        }
+
+        function requestRepositories(token) {
+            const query =
+                "query { viewer { repositories(first: 100) { totalCount nodes { nameWithOwner name description createdAt } pageInfo { endCursor hasNextPage } } } }"
+
+            fetch('https://api.github.com/graphql', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': 'bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        query: query
+                    })
+                })
+                .then(r => r.json())
+                .then(reponse => {
+                    const repositories = reponse.data.viewer.repositories
+
+                    localStorage.setItem('repositories', JSON.stringify(repositories))
+
+                    elTotalCount.innerHTML = repositories.totalCount
+                    populateListRepositories(repositories.nodes)
+                });
+        }
+
+        const input = document.getElementById('personal-token')
+        const btnSearch = document.getElementById('button-search')
+        btnSearch.addEventListener('click', () => {
+            const token = localStorage.getItem('token')
+
+            if (input.value !== "") {
+                localStorage.setItem('token', input.value)
+                requestRepositories(input.value)
+            } else if (token !== null) {
+                requestRepositories(token)
+            } else {
+                alert("required personal token")
+            }
+        })
+
+        const localStorageRepositories = localStorage.getItem('repositories')
+        if (localStorageRepositories !== null) {
+            const repositories = JSON.parse(localStorageRepositories)
+            elTotalCount.innerHTML = repositories.totalCount
+            populateListRepositories(repositories.nodes)
+        }
+    </script>
+</body>
+
+</html>
